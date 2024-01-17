@@ -1,7 +1,7 @@
 
 # Disk Volume File Organizer
 
-This Python script is designed to help organize and copy files from specific disk volumes based on user-defined criteria. It is especially useful for managing files across multiple external storage devices.
+One day, I was copying files from my Sony A74 and A7s3. I found Sony's filing system quite confusing. Therefore, I created this script to help me copy all the files from the camera to my hard drive and categorize videos and photos for me.
 
 ## Features
 
