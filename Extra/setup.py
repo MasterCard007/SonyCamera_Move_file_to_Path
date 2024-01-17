@@ -6,8 +6,8 @@ setup(
     packages=find_packages(),
     url='https://github.com/yourusername/FileStatsAnalyzer',
     license='MIT',
-    author='Your Name',
-    author_email='your.email@example.com',
+    author='MasterCard007',
+    author_email='',
     description='A utility script to analyze file statistics in directories or external drives.',
     install_requires=[
         'humanize',

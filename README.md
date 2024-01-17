@@ -13,7 +13,7 @@ This Python script is designed to help organize and copy files from specific dis
 
 ## How to Use
 
-1. **Specify Volume Keyword**: Modify the `list_volumes` function call in the main script to include your specific volume keyword (e.g., 'CFSC', 'Untitled').
+1. **Specify Volume Keyword**: Modify the `list_volumes` function call in the main script to include all the volume(s)
 2. **Run the Script**: Execute the script. It will list the volumes matching the specified keywords.
 3. **Select a Disk**: Enter the number corresponding to the disk you want to process.
 4. **File Copying**: The script will automatically find and copy the relevant files to the new folder in the selected volume.

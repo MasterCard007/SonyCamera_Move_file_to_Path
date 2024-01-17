@@ -3,8 +3,8 @@ import shutil
 from datetime import datetime
 from tqdm import tqdm
 
-def list_volumes(filter_keyword):
-    volumes = [f'/Volumes/{d}' for d in os.listdir('/Volumes') if filter_keyword in d and os.path.ismount(f'/Volumes/{d}')]
+def list_volumes():
+    volumes = [f'/Volumes/{d}' for d in os.listdir('/Volumes') if os.path.ismount(f'/Volumes/{d}')]
     return volumes
 
 def select_disk(volumes):
@@ -51,13 +51,12 @@ def copy_files(files, destination):
 
 
 # Main Script
-cfsc_volumes = list_volumes("CFSC")
-selected_volume = select_disk(cfsc_volumes)
+all_volumes = list_volumes()
+selected_volume = select_disk(all_volumes)
 new_folder = create_folder_in_volume(selected_volume)
 
-untitled_volumes = list_volumes("Untitled")
 extensions = ['.mp4', '.arw']
-files_to_copy = find_files(untitled_volumes, extensions)
+files_to_copy = find_files(all_volumes, extensions)
 
 copy_files(files_to_copy, new_folder)
 
