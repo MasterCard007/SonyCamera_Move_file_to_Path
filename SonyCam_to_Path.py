@@ -2,11 +2,16 @@ import os
 import shutil
 from datetime import datetime
 from tqdm import tqdm
-from PIL import Image
+import time
 
-def list_volumes():
+def list_volumes_for_destination():
     volumes = [f'/Volumes/{d}' for d in os.listdir('/Volumes') 
                if os.path.ismount(f'/Volumes/{d}') and 'Untitled' not in d and 'PMHOME' not in d]
+    return volumes
+
+def list_volumes_for_scanning():
+    volumes = [f'/Volumes/{d}' for d in os.listdir('/Volumes') 
+               if os.path.ismount(f'/Volumes/{d}') and ('Untitled' in d or 'PMHOME' in d)]
     return volumes
 
 def select_disk(volumes):
@@ -22,77 +27,103 @@ def create_folder_in_volume(volume):
         os.makedirs(folder_path)
     return folder_path
 
-def get_original_creation_date(image_path):
-    with Image.open(image_path) as img:
-        exif_data = img._getexif()
-        if exif_data is not None:
-            creation_time = exif_data.get(36867)  # EXIF tag for DateTimeOriginal
-            if creation_time:
-                return creation_time
-    return None
+def get_camera_name_from_file(filename):
+    if "A7S3" in filename or "A7S3" in filename:
+        return "A7s3"
+    elif "A74" in filename:
+        return "A74"
+    elif "A73" in filename:
+        return "A73"
+    else:
+        return "Unknown"
 
-def find_files(extensions):
-    untitled_volumes = [f'/Volumes/{d}' for d in os.listdir('/Volumes') 
-                        if os.path.ismount(f'/Volumes/{d}') and 'Untitled' in d]
-    files = []
-    for vol in untitled_volumes:
-        for root, dirs, files_in_dir in os.walk(vol):
-            for file in tqdm(files_in_dir, desc=f"Scanning {vol}", leave=False):
-                if any(file.lower().endswith(ext.lower()) for ext in extensions):
-                    files.append(os.path.join(root, file))
-    # print(f"Found {len(files)} files to copy.")  # Debugging message
-    return files
+def find_camera_files_and_create_folders(volumes, destination_folder):
+    camera_folders = {}
+    for volume in volumes:
+        for root, dirs, files in os.walk(volume):
+            for file in files:
+                if file.lower().endswith(('.arw', '.mp4')):
+                    camera_name = get_camera_name_from_file(file)
+                    file_type = "Photo" if file.lower().endswith('.arw') else "Video"
+                    folder_name = f"{camera_name}_{file_type}"
+                    folder_path = os.path.join(destination_folder, folder_name)
+                    if folder_name not in camera_folders and camera_name != "Unknown":
+                        if not os.path.exists(folder_path):
+                            os.makedirs(folder_path)
+                        camera_folders[folder_name] = folder_path
+    return camera_folders
 
-def copy_files(files, destination):
-    subfolders = {'Photos': '.arw', 'A74': 'A74', 'A7S3': 'A7S3'}
-    files_to_copy = {subfolder: [] for subfolder in subfolders}
+def gather_files_for_copying(volumes, camera_folders, destination_folder):
+    files_to_copy = []
+    for volume in volumes:
+        for root, dirs, files in os.walk(volume):
+            for file in files:
+                if file.lower().endswith(('.arw', '.mp4')):
+                    src = os.path.join(root, file)
+                    camera_name = get_camera_name_from_file(file)
+                    file_type = "Photo" if file.lower().endswith('.arw') else "Video"
+                    folder_name = f"{camera_name}_{file_type}"
+                    if folder_name in camera_folders:
+                        dst = os.path.join(camera_folders[folder_name], file)
+                        if not os.path.exists(dst):
+                            files_to_copy.append((src, dst))
+    return files_to_copy
 
-    for file in files:
-        file_lower = file.lower()
-        # print(f"Checking file: {file}")  # Debugging message
+def get_total_size(files_to_copy):
+    total_size = sum(os.path.getsize(src) for src, _ in files_to_copy)
+    return total_size
 
-        if file_lower.endswith(subfolders['Photos']):
-            files_to_copy['Photos'].append(file)
-            # print(f"Added to Photos: {file}")  # Debugging message
+def copy_files(files_to_copy, total_size, total_files):
+    copied_size = 0
+    files_copied = 0
 
-        elif subfolders['A74'].lower() in file_lower and 'a7s3' not in file_lower and file_lower.endswith('.mp4'):
-            files_to_copy['A74'].append(file)
-            # print(f"Added to A74: {file}")  # Debugging message
+    with tqdm(total=total_size, unit='B', unit_scale=True, desc="Copying data") as pbar_data:
+        with tqdm(total=total_files, unit='files', desc="Files copied") as pbar_files:
+            for src, dst in files_to_copy:
+                if os.path.exists(src):
+                    shutil.copy2(src, dst)
+                    size = os.path.getsize(src)
+                    copied_size += size
+                    files_copied += 1
+                    pbar_data.update(size)
+                    pbar_files.update(1)
 
-        elif subfolders['A7S3'].lower() in file_lower and file_lower.endswith('.mp4'):
-            files_to_copy['A7S3'].append(file)
-            # print(f"Added to A7S3: {file}")  # Debugging message
+def summarize_results(start_time, camera_folders):
+    total_files = 0
+    total_size = 0
+    for folder in camera_folders.values():
+        for file in os.listdir(folder):
+            total_files += 1
+            total_size += os.path.getsize(os.path.join(folder, file))
+    
+    print("Summary:")
+    print(f"Number of files copied: {total_files}")
+    print(f"Total size of files: {total_size / (1024**3):.2f} GB")
+    print(f"List of cameras detected: {list(camera_folders.keys())}")
+    print(f"Total run time: {time.time() - start_time:.2f} seconds")
 
-    for subfolder, files in files_to_copy.items():
-        # print(f"Processing {subfolder} with {len(files)} files.")  # Debugging message
-        for file in tqdm(files, desc=f"Copying files to {subfolder}", leave=False):
-            path = os.path.join(destination, subfolder)
-            if not os.path.exists(path):
-                os.makedirs(path)
-                # print(f"Created subfolder: {path}")  # Debugging message
+def main():
+    start_time = time.time()
 
-            try:
-                shutil.copy(file, path)
-                # print(f"Copied {file} to {path}")  # Debugging message
-                if subfolder == 'Photos':
-                    creation_date = get_original_creation_date(file)
-                    if creation_date:
-                        # print(f"Original Creation Date of {file}: {creation_date}")
-                        pass
-                    else:
-                        # print(f"Creation date not found in EXIF data for {file}.")
-                        pass
-            except Exception as e:
-                print(f"Error copying {file}: {e}")
+    # Select disk for destination and create folder
+    destination_volumes = list_volumes_for_destination()
+    selected_volume = select_disk(destination_volumes)
+    destination_folder = create_folder_in_volume(selected_volume)
 
-# Main Script
-all_volumes = list_volumes()
-selected_volume = select_disk(all_volumes)
-new_folder = create_folder_in_volume(selected_volume)
+    # Find files and create camera folders
+    scanning_volumes = list_volumes_for_scanning()
+    camera_folders = find_camera_files_and_create_folders(scanning_volumes, destination_folder)
 
-extensions = ['.mp4', '.arw']
-files_to_copy = find_files(extensions)
+    # Gather files for copying
+    files_to_copy = gather_files_for_copying(scanning_volumes, camera_folders, destination_folder)
+    total_files = len(files_to_copy)
 
-copy_files(files_to_copy, new_folder)
+    # Calculate total size and Copy files
+    total_size = get_total_size(files_to_copy)
+    copy_files(files_to_copy, total_size, total_files)
 
-print("Files have been copied successfully.")
+    # Summarize results
+    summarize_results(start_time, camera_folders)
+
+if __name__ == "__main__":
+    main()
