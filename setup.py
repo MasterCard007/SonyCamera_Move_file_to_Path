@@ -7,7 +7,7 @@ setup(
     packages=find_packages(),
     description='A script to process images from Sony Cameras',
     author='Your Name',
-    author_email='enochliliwy@gmail.com',
+    author_email='',
     install_requires=[
         'Pillow',   # For PIL.Image
         'tqdm',     # For progress bar
